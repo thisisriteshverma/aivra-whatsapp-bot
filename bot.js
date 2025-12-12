@@ -8,7 +8,8 @@ async function startBot() {
     const { state, saveCreds } = await useMultiFileAuthState("auth");
 
     sock = makeWASocket({
-        auth: state
+        auth: state,
+        printQRInTerminal: false   // Render can't print QR, so we handle manually
     });
 
     sock.ev.on("connection.update", ({ connection, qr }) => {
@@ -27,17 +28,16 @@ async function startBot() {
         }
     });
 
-    // 🔥 THIS LINE IS REQUIRED
     sock.ev.on("creds.update", saveCreds);
 }
 
 await startBot();
 
-// EXPRESS API
+// --- EXPRESS API ---
 const app = express();
 app.use(express.json());
 
-// SEND MESSAGE ENDPOINT
+// send WhatsApp message
 app.post("/send", async (req, res) => {
     try {
         const { number, message } = req.body;
@@ -50,15 +50,20 @@ app.post("/send", async (req, res) => {
         await sock.sendMessage(jid, { text: message });
 
         console.log(`📨 Sent to ${number}: ${message}`);
-
         res.json({ success: true });
+
     } catch (err) {
         console.error("❌ Error sending message:", err);
         res.json({ success: false, error: err.toString() });
     }
 });
 
-// START SERVER
-app.listen(3000, () => {
-    console.log("\n🚀 Aivra WhatsApp API running at http://localhost:3000/send\n");
+// ---- IMPORTANT FOR RENDER ----
+const PORT = process.env.PORT || 3000;
+
+// Prevent Render from sleeping (keep-alive)
+setInterval(() => {}, 10000);
+
+app.listen(PORT, () => {
+    console.log(`\n🚀 Aivra WhatsApp API running on PORT ${PORT}\n`);
 });
